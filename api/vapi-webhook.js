@@ -63,6 +63,14 @@ router.post('/webhook', async (req, res) => {
         });
         break;
         
+      case 'conversation-update':
+      case 'conversation.update':
+        logger.debug('Conversation update', {
+          callId: call?.id,
+          messageCount: eventData.message?.messages?.length || 0
+        });
+        break;
+        
       default:
         logger.warn('Unhandled webhook type', { type, body: req.body });
     }
