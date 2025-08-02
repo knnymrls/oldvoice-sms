@@ -9,6 +9,7 @@ const smsHandler = require('./lib/sms-handler');
 // Import routes
 const twilioWebhook = require('./api/twilio-webhook');
 const vapiWebhook = require('./api/vapi-webhook');
+const telegramWebhook = require('./api/telegram-webhook');
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/twilio', twilioWebhook);
 app.use('/api/vapi', vapiWebhook);
+app.use('/api/telegram', telegramWebhook);
 
 // Admin endpoint to process pending calls
 app.post('/api/admin/process-pending', async (req, res) => {
