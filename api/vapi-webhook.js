@@ -3,51 +3,68 @@ const router = express.Router();
 const db = require('../lib/database');
 const twilioService = require('../lib/twilio-client');
 const vapiService = require('../lib/vapi-client');
+const logger = require('../lib/logger');
 
 // Vapi webhook endpoint
 router.post('/webhook', async (req, res) => {
   try {
-    const { type, call, assistant } = req.body;
+    logger.info('Vapi webhook received', { 
+      headers: req.headers,
+      bodyKeys: Object.keys(req.body),
+      body: JSON.stringify(req.body, null, 2) 
+    });
     
-    console.log('Vapi webhook received:', { type, callId: call?.id });
+    // Vapi sends the event data in different formats depending on the event
+    const eventData = req.body;
+    const type = eventData.type || eventData.event?.type || eventData.message?.type;
+    const call = eventData.call || eventData.data?.call || eventData;
+    const assistant = eventData.assistant || eventData.data?.assistant;
+    
+    logger.info('Vapi webhook processed', { type, callId: call?.id });
     
     switch (type) {
       case 'call-started':
+      case 'call.started':
         await handleCallStarted(call, assistant);
         break;
         
       case 'call-ended':
+      case 'call.ended':
         await handleCallEnded(call);
         break;
         
       case 'transcript-ready':
+      case 'transcript.ready':
+      case 'call.transcript':
         await handleTranscriptReady(call);
         break;
         
       case 'recording-ready':
+      case 'recording.ready':
+      case 'call.recording':
         await handleRecordingReady(call);
         break;
         
       default:
-        console.log('Unhandled webhook type:', type);
+        logger.warn('Unhandled webhook type', { type, body: req.body });
     }
     
     res.json({ success: true });
     
   } catch (error) {
-    console.error('Vapi webhook error:', error);
+    logger.error('Vapi webhook error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 async function handleCallStarted(call, assistant) {
-  console.log('Call started:', call.id);
+  logger.info('Call started', { callId: call.id, assistantId: assistant?.id });
   // Update story request status if needed
 }
 
 async function handleCallEnded(call) {
   try {
-    console.log('Call ended:', call.id, 'Duration:', call.duration);
+    logger.info('Call ended', { callId: call.id, duration: call.duration });
     
     // Find story request by call ID
     const { data: storyRequest } = await db.supabase
@@ -57,7 +74,7 @@ async function handleCallEnded(call) {
       .single();
     
     if (!storyRequest) {
-      console.error('Story request not found for call:', call.id);
+      logger.error('Story request not found for call', { callId: call.id });
       return;
     }
     
@@ -68,13 +85,13 @@ async function handleCallEnded(call) {
     });
     
   } catch (error) {
-    console.error('Error handling call ended:', error);
+    logger.error('Error handling call ended', error);
   }
 }
 
 async function handleTranscriptReady(call) {
   try {
-    console.log('Transcript ready for call:', call.id);
+    logger.info('Transcript ready for call', { callId: call.id });
     
     // Find story request
     const { data: storyRequest } = await db.supabase
@@ -84,7 +101,7 @@ async function handleTranscriptReady(call) {
       .single();
     
     if (!storyRequest) {
-      console.error('Story request not found for call:', call.id);
+      logger.error('Story request not found for call', { callId: call.id });
       return;
     }
     
@@ -94,13 +111,13 @@ async function handleTranscriptReady(call) {
     });
     
   } catch (error) {
-    console.error('Error handling transcript:', error);
+    logger.error('Error handling transcript', error);
   }
 }
 
 async function handleRecordingReady(call) {
   try {
-    console.log('Recording ready for call:', call.id);
+    logger.info('Recording ready for call', { callId: call.id });
     
     // Find story request
     const { data: storyRequest } = await db.supabase
@@ -110,7 +127,7 @@ async function handleRecordingReady(call) {
       .single();
     
     if (!storyRequest) {
-      console.error('Story request not found for call:', call.id);
+      logger.error('Story request not found for call', { callId: call.id });
       return;
     }
     
@@ -139,7 +156,7 @@ async function handleRecordingReady(call) {
     await twilioService.sendSMS(storyRequest.users.phone_number, message);
     
   } catch (error) {
-    console.error('Error handling recording ready:', error);
+    logger.error('Error handling recording ready', error);
     
     // Try to notify user of failure
     try {
@@ -160,7 +177,7 @@ async function handleRecordingReady(call) {
         });
       }
     } catch (notifyError) {
-      console.error('Failed to notify user:', notifyError);
+      logger.error('Failed to notify user', notifyError);
     }
   }
 }
