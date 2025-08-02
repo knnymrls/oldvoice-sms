@@ -71,6 +71,11 @@ router.post('/webhook', async (req, res) => {
         });
         break;
         
+      case 'end-of-call-report':
+      case 'call.ended.report':
+        await handleCallEndReport(eventData.message);
+        break;
+        
       default:
         logger.warn('Unhandled webhook type', { type, body: req.body });
     }
@@ -138,6 +143,48 @@ async function handleTranscriptReady(call) {
     
   } catch (error) {
     logger.error('Error handling transcript', error);
+  }
+}
+
+async function handleCallEndReport(report) {
+  try {
+    logger.info('Call end report received', {
+      callId: report.call?.id,
+      duration: report.durationSeconds,
+      endedReason: report.endedReason,
+      cost: report.cost,
+      summary: report.summary
+    });
+    
+    // Update story request with end reason
+    if (report.call?.id) {
+      const { data: storyRequest } = await db.supabase
+        .from('story_requests')
+        .select('*')
+        .eq('vapi_call_id', report.call.id)
+        .single();
+      
+      if (storyRequest) {
+        await db.updateStoryRequest(storyRequest.id, {
+          status: report.endedReason === 'hangup' ? 'completed' : 'failed',
+          call_ended_reason: report.endedReason,
+          duration_seconds: report.durationSeconds,
+          cost: report.cost,
+          transcript: report.transcript,
+          recording_url: report.recordingUrl
+        });
+        
+        // If call failed due to silence, notify user
+        if (report.endedReason === 'silence-timed-out') {
+          logger.warn('Call ended due to silence timeout', { 
+            callId: report.call.id,
+            phoneNumber: report.customer?.number 
+          });
+        }
+      }
+    }
+  } catch (error) {
+    logger.error('Error handling call end report', error);
   }
 }
 
