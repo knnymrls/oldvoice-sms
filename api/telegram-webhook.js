@@ -33,13 +33,19 @@ router.post('/webhook', async (req, res) => {
     const response = await smsHandler.handleIncomingSMS(uniqueId, text);
 
     // Send response back to user
-    await bot.sendMessage(chatId, response, {
-      parse_mode: 'Markdown',
-      reply_markup: {
+    const keyboard = getKeyboardForState(response);
+    const messageOptions = {
+      parse_mode: 'Markdown'
+    };
+    
+    if (keyboard) {
+      messageOptions.reply_markup = {
         resize_keyboard: true,
-        keyboard: getKeyboardForState(response)
-      }
-    });
+        keyboard: keyboard
+      };
+    }
+    
+    await bot.sendMessage(chatId, response, messageOptions);
 
     res.sendStatus(200);
   } catch (error) {
@@ -72,10 +78,8 @@ function getKeyboardForState(response) {
     ];
   }
   
-  // Default - remove custom keyboard
-  return {
-    remove_keyboard: true
-  };
+  // Default - no keyboard
+  return null;
 }
 
 // Set webhook endpoint
