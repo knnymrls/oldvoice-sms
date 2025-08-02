@@ -45,6 +45,24 @@ router.post('/webhook', async (req, res) => {
         await handleRecordingReady(call);
         break;
         
+      case 'speech-update':
+      case 'speech.update':
+        // Log speech updates but don't need to process them
+        logger.debug('Speech update received', { 
+          callId: call?.id,
+          role: eventData.message?.role,
+          status: eventData.message?.status 
+        });
+        break;
+        
+      case 'status-update':
+      case 'status.update':
+        logger.info('Call status update', {
+          callId: call?.id,
+          status: eventData.message?.status || call?.status
+        });
+        break;
+        
       default:
         logger.warn('Unhandled webhook type', { type, body: req.body });
     }
