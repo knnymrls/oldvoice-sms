@@ -3,6 +3,7 @@ const router = express.Router();
 const smsHandler = require('../lib/sms-handler');
 const twilioService = require('../lib/twilio-client');
 const db = require('../lib/database');
+const logger = require('../lib/logger');
 
 // Twilio webhook for incoming SMS
 router.post('/sms', async (req, res) => {
@@ -16,6 +17,7 @@ router.post('/sms', async (req, res) => {
     }
     
     const { From: phoneNumber, Body: message } = req.body;
+    logger.info('Twilio webhook received', { phoneNumber, messagePreview: message.substring(0, 50) });
     
     // Handle the SMS
     const response = await smsHandler.handleIncomingSMS(phoneNumber, message);
@@ -28,7 +30,7 @@ router.post('/sms', async (req, res) => {
     res.send(twilioService.formatResponse(response));
     
   } catch (error) {
-    console.error('Twilio webhook error:', error);
+    logger.error('Twilio webhook error', { error: error.message, stack: error.stack });
     
     // Send error response
     res.type('text/xml');
@@ -43,7 +45,7 @@ router.post('/sms/status', async (req, res) => {
   try {
     const { MessageSid, MessageStatus, ErrorCode } = req.body;
     
-    console.log('SMS Status Update:', {
+    logger.info('SMS Status Update', {
       sid: MessageSid,
       status: MessageStatus,
       error: ErrorCode
@@ -51,7 +53,7 @@ router.post('/sms/status', async (req, res) => {
     
     res.sendStatus(200);
   } catch (error) {
-    console.error('Status callback error:', error);
+    logger.error('Status callback error', { error: error.message });
     res.sendStatus(500);
   }
 });
